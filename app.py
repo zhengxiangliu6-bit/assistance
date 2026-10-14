@@ -32,8 +32,7 @@ from ui.components import (
     SectionHeader, EmptyState, ChatWelcomeView,
 )
 from ui.animations import fade_in, TypingDots, StatusDot
-
-CATS = {"habit": "习惯", "preference": "偏好", "info": "信息", "general": "其他"}
+from i18n import t, cat_name, get_language, set_language
 
 
 # ── Worker ────────────────────────────────────────────────
@@ -72,14 +71,14 @@ def _field_label(text):
 class EditTaskDialog(QDialog):
     def __init__(self, task, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Edit Task")
+        self.setWindowTitle(t("dialog.edit_task"))
         self.setMinimumWidth(440)
         self.setStyleSheet(dialog_style())
         layout = QVBoxLayout(self)
         layout.setSpacing(S.SM)
         layout.setContentsMargins(S.LG, S.LG, S.LG, S.LG)
 
-        layout.addWidget(_field_label("TITLE"))
+        layout.addWidget(_field_label(t("dialog.title")))
         self.title_input = QLineEdit(task["title"])
         self.title_input.setStyleSheet(input_field())
         layout.addWidget(self.title_input)
@@ -87,9 +86,12 @@ class EditTaskDialog(QDialog):
         row = QHBoxLayout()
         row.setSpacing(S.SM)
         for lbl_text, attr, widget_fn in [
-            ("PRIORITY", "priority_combo", lambda: self._combo(["low", "normal", "high"], task.get("priority", "normal"))),
-            ("DATE", "due_input", lambda: self._line(task.get("due_date", ""))),
-            ("TIME", "time_input", lambda: self._line(task.get("due_time", ""), "17:30")),
+            (t("dialog.priority"), "priority_combo",
+             lambda: self._combo(["low", "normal", "high"], task.get("priority", "normal"))),
+            (t("dialog.date"), "due_input",
+             lambda: self._line(task.get("due_date", ""))),
+            (t("dialog.time"), "time_input",
+             lambda: self._line(task.get("due_time", ""), "17:30")),
         ]:
             col = QVBoxLayout()
             col.addWidget(_field_label(lbl_text))
@@ -102,11 +104,11 @@ class EditTaskDialog(QDialog):
         layout.addSpacing(S.SM)
         btns = QHBoxLayout()
         btns.addStretch()
-        c = QPushButton("Cancel")
+        c = QPushButton(t("dialog.cancel"))
         c.setStyleSheet(btn_secondary())
         c.clicked.connect(self.reject)
         btns.addWidget(c)
-        o = QPushButton("Save")
+        o = QPushButton(t("dialog.save"))
         o.setStyleSheet(btn_primary())
         o.clicked.connect(self.accept)
         btns.addWidget(o)
@@ -138,21 +140,21 @@ class EditTaskDialog(QDialog):
 class EditMemoryDialog(QDialog):
     def __init__(self, memory, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Edit Memory")
+        self.setWindowTitle(t("dialog.edit_memory"))
         self.setMinimumWidth(480)
         self.setStyleSheet(dialog_style())
         layout = QVBoxLayout(self)
         layout.setSpacing(S.SM)
         layout.setContentsMargins(S.LG, S.LG, S.LG, S.LG)
 
-        layout.addWidget(_field_label("CONTENT"))
+        layout.addWidget(_field_label(t("dialog.content")))
         self.content_edit = QTextEdit()
         self.content_edit.setText(memory.get("content", ""))
         self.content_edit.setMinimumHeight(120)
         self.content_edit.setStyleSheet(textedit_field())
         layout.addWidget(self.content_edit)
 
-        layout.addWidget(_field_label("CATEGORY"))
+        layout.addWidget(_field_label(t("dialog.category")))
         self.cat_combo = QComboBox()
         self.cat_combo.addItems(["habit", "preference", "info", "general"])
         self.cat_combo.setCurrentText(memory.get("category", "general"))
@@ -162,11 +164,11 @@ class EditMemoryDialog(QDialog):
         layout.addSpacing(S.SM)
         btns = QHBoxLayout()
         btns.addStretch()
-        c = QPushButton("Cancel")
+        c = QPushButton(t("dialog.cancel"))
         c.setStyleSheet(btn_secondary())
         c.clicked.connect(self.reject)
         btns.addWidget(c)
-        o = QPushButton("Save")
+        o = QPushButton(t("dialog.save"))
         o.setStyleSheet(btn_primary())
         o.clicked.connect(self.accept)
         btns.addWidget(o)
@@ -342,7 +344,7 @@ class SchedulePage(QWidget):
         add_row = QHBoxLayout()
         add_row.setSpacing(S.SM)
         self.add_input = QLineEdit()
-        self.add_input.setPlaceholderText("Add a new task...")
+        self.add_input.setPlaceholderText(t("schedule.add_placeholder"))
         self.add_input.setStyleSheet(input_field())
         self.add_input.returnPressed.connect(self._on_add)
         add_row.addWidget(self.add_input, 1)
@@ -351,7 +353,7 @@ class SchedulePage(QWidget):
         self.pri_combo.setStyleSheet(combo_field())
         self.pri_combo.setFixedWidth(90)
         add_row.addWidget(self.pri_combo)
-        ab = QPushButton("Add")
+        ab = QPushButton(t("schedule.add"))
         ab.setStyleSheet(btn_primary())
         ab.setFixedWidth(60)
         ab.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -377,7 +379,7 @@ class SchedulePage(QWidget):
 
         tasks = load_tasks()
         if not tasks:
-            self.tasks_layout.addWidget(EmptyState("No tasks. Add one above."))
+            self.tasks_layout.addWidget(EmptyState(t("schedule.empty")))
             return
 
         from datetime import datetime as dt
@@ -399,21 +401,21 @@ class SchedulePage(QWidget):
         dn = [t for t in tasks if t["done"]]
 
         for title, items, color, sec in [
-            ("Overdue", ov, C.DANGER, "overdue"),
-            ("Today", td, C.ACCENT, "normal"),
-            ("Upcoming", fu, C.TEXT_3, "normal"),
-            ("Unscheduled", nd, C.TEXT_3, "normal"),
-            ("Completed", dn, C.TEXT_3, "done"),
+            (t("schedule.overdue"), ov, C.DANGER, "overdue"),
+            (t("schedule.today"), td, C.ACCENT, "normal"),
+            (t("schedule.upcoming"), fu, C.TEXT_3, "normal"),
+            (t("schedule.unscheduled"), nd, C.TEXT_3, "normal"),
+            (t("schedule.completed"), dn, C.TEXT_3, "done"),
         ]:
             if not items:
                 continue
             self.tasks_layout.addWidget(SectionHeader(title, len(items), color))
-            for i, t in enumerate(items):
-                self.tasks_layout.addWidget(self._card(t, i, len(items), sec))
+            for i, tk in enumerate(items):
+                self.tasks_layout.addWidget(self._card(tk, i, len(items), sec))
 
         self._sched_next(td, today, cur_time)
 
-    def _card(self, t, idx, total, sec):
+    def _card(self, task, idx, total, sec):
         f = QFrame()
         f.setMinimumHeight(44)
         bg = f"rgba(255,107,133,0.06)" if sec == "overdue" else C.BG_3
@@ -424,7 +426,7 @@ class SchedulePage(QWidget):
         row = QHBoxLayout(f)
         row.setContentsMargins(S.SM, S.XXS, S.XS, S.XXS)
         row.setSpacing(S.XS)
-        tid = t["id"]
+        tid = task["id"]
 
         # Arrows
         aw = QWidget()
@@ -447,42 +449,42 @@ class SchedulePage(QWidget):
         row.addWidget(aw)
 
         cb = QCheckBox()
-        cb.setChecked(t["done"])
+        cb.setChecked(task["done"])
         cb.setStyleSheet(checkbox_style())
         cb.stateChanged.connect(
             lambda s, i=tid: (complete_task(i) if s else uncomplete_task(i), self.refresh()))
         row.addWidget(cb)
 
-        if t.get("priority") == "high":
+        if task.get("priority") == "high":
             p = QLabel("!")
             p.setFont(QFont(F.SANS, F.SM, F.BOLD))
             p.setStyleSheet(f"color: {C.DANGER}; border:none;")
             p.setFixedWidth(12)
             row.addWidget(p)
 
-        lbl = QLabel(t["title"])
+        lbl = QLabel(task["title"])
         lbl.setFont(QFont(F.SANS, F.SM))
-        color = C.TEXT_3 if t["done"] else (C.DANGER if sec == "overdue" else C.TEXT_0)
-        deco = "text-decoration: line-through;" if t["done"] else ""
+        color = C.TEXT_3 if task["done"] else (C.DANGER if sec == "overdue" else C.TEXT_0)
+        deco = "text-decoration: line-through;" if task["done"] else ""
         lbl.setStyleSheet(f"color: {color}; {deco} border:none;")
         row.addWidget(lbl, 1)
 
         tp = []
-        if t.get("due_time"):
-            tp.append(t["due_time"])
-        if t.get("due_date"):
-            tp.append(t["due_date"])
+        if task.get("due_time"):
+            tp.append(task["due_time"])
+        if task.get("due_date"):
+            tp.append(task["due_date"])
         if tp:
             tl = QLabel("  ".join(tp))
             tl.setFont(QFont(F.MONO, F.XS))
             tl.setStyleSheet(f"color: {C.TEXT_3}; border:none;")
             row.addWidget(tl)
 
-        eb = QPushButton("Edit")
+        eb = QPushButton(t("schedule.edit"))
         eb.setStyleSheet(btn_ghost("font-size:10px;"))
         eb.setFixedSize(36, 24)
         eb.setCursor(Qt.CursorShape.PointingHandCursor)
-        eb.clicked.connect(lambda _, task=t: self._edit(task))
+        eb.clicked.connect(lambda _, tk=task: self._edit(tk))
         row.addWidget(eb)
 
         xb = QPushButton("x")
@@ -542,7 +544,7 @@ class MemoryPage(QWidget):
         add_row = QHBoxLayout()
         add_row.setSpacing(S.SM)
         self.add_input = QLineEdit()
-        self.add_input.setPlaceholderText("Add a new memory...")
+        self.add_input.setPlaceholderText(t("memory.add_placeholder"))
         self.add_input.setStyleSheet(input_field())
         self.add_input.returnPressed.connect(self._on_add)
         add_row.addWidget(self.add_input, 1)
@@ -551,7 +553,7 @@ class MemoryPage(QWidget):
         self.cat_combo.setStyleSheet(combo_field())
         self.cat_combo.setFixedWidth(100)
         add_row.addWidget(self.cat_combo)
-        ab = QPushButton("Add")
+        ab = QPushButton(t("memory.add"))
         ab.setStyleSheet(btn_primary())
         ab.setFixedWidth(60)
         ab.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -584,7 +586,7 @@ class MemoryPage(QWidget):
 
         memories = search_memories("")
         if not memories:
-            self.items_layout.addWidget(EmptyState("No memories stored yet."))
+            self.items_layout.addWidget(EmptyState(t("memory.empty")))
             return
 
         cat_colors = {"habit": C.SUCCESS, "preference": C.PURPLE, "info": C.ACCENT, "general": C.TEXT_3}
@@ -600,7 +602,7 @@ class MemoryPage(QWidget):
 
             cat = m.get("category", "general")
             cc = cat_colors.get(cat, C.TEXT_3)
-            badge = QLabel(CATS.get(cat, cat))
+            badge = QLabel(cat_name(cat))
             badge.setFont(QFont(F.SANS, F.XS - 1))
             badge.setFixedHeight(18)
             badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -618,7 +620,7 @@ class MemoryPage(QWidget):
             cl.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
             row.addWidget(cl, 1)
 
-            eb = QPushButton("Edit")
+            eb = QPushButton(t("schedule.edit"))
             eb.setStyleSheet(btn_ghost("font-size:10px;"))
             eb.setFixedSize(36, 24)
             eb.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -672,10 +674,10 @@ class IdeasPage(QWidget):
 
         ideas = load_ideas()
         if not ideas:
-            self.items_layout.addWidget(EmptyState("No ideas yet. Chat to analyze one."))
+            self.items_layout.addWidget(EmptyState(t("ideas.empty")))
             return
 
-        sn = {"draft": "Draft", "in_progress": "In Progress", "done": "Done", "abandoned": "Abandoned"}
+        sn = {k: t(f"ideas.status.{k}") for k in ["draft", "in_progress", "done", "abandoned"]}
         sc = {"draft": C.TEXT_3, "in_progress": C.WARNING, "done": C.SUCCESS, "abandoned": C.TEXT_3}
 
         for idea in ideas:
@@ -746,6 +748,39 @@ class SettingsPage(QWidget):
                 w.widget().deleteLater()
         self._cbs.clear()
 
+        # Language selector
+        gl = QLabel(t("nav.settings").upper())
+        gl.setFont(QFont(F.SANS, F.XS, F.SEMIBOLD))
+        gl.setStyleSheet(f"color: {C.TEXT_3}; letter-spacing: 1px; padding-top: 8px;")
+        self.items_layout.addWidget(gl)
+
+        lang_frame = QFrame()
+        lang_frame.setMinimumHeight(48)
+        lang_frame.setStyleSheet(
+            f"QFrame {{ background: {C.BG_3}; border-radius: {D.RADIUS_MD}px; "
+            f"border: 1px solid {C.BORDER_SUB}; }}")
+        lr = QHBoxLayout(lang_frame)
+        lr.setContentsMargins(S.MD, S.XS, S.MD, S.XS)
+        li = QVBoxLayout()
+        li.setSpacing(0)
+        ln = QLabel(t("settings.language"))
+        ln.setFont(QFont(F.SANS, F.SM))
+        ln.setStyleSheet(f"color: {C.TEXT_0}; border:none;")
+        li.addWidget(ln)
+        ld = QLabel(t("settings.language_desc"))
+        ld.setFont(QFont(F.SANS, F.XS))
+        ld.setStyleSheet(f"color: {C.TEXT_3}; border:none;")
+        li.addWidget(ld)
+        lr.addLayout(li, 1)
+        lang_combo = QComboBox()
+        lang_combo.addItems(["zh", "en"])
+        lang_combo.setCurrentText(get_language())
+        lang_combo.setStyleSheet(combo_field())
+        lang_combo.setFixedWidth(70)
+        lang_combo.currentTextChanged.connect(self._on_lang_change)
+        lr.addWidget(lang_combo)
+        self.items_layout.addWidget(lang_frame)
+
         cur_grp = None
         for key, pd in PERMISSION_DEFS.items():
             grp = pd.get("group", "")
@@ -780,6 +815,12 @@ class SettingsPage(QWidget):
             row.addWidget(cb)
             self._cbs[key] = cb
             self.items_layout.addWidget(f)
+
+    def _on_lang_change(self, lang):
+        set_language(lang)
+        mw = self.window()
+        if hasattr(mw, '_refresh_lang'):
+            mw._refresh_lang()
 
 
 # ══════════════════════════════════════════════════════════
@@ -837,8 +878,9 @@ class MainWindow(QMainWindow):
         sl.addSpacing(S.LG)
 
         # Nav
-        for i, name in enumerate(["Chat", "Schedule", "Memory", "Ideas", "Settings"]):
-            b = SidebarNavItem(name)
+        _nav_keys = ["nav.chat", "nav.schedule", "nav.memory", "nav.ideas", "nav.settings"]
+        for i, key in enumerate(_nav_keys):
+            b = SidebarNavItem(t(key))
             b.clicked.connect(lambda _, idx=i: self._switch(idx))
             sl.addWidget(b)
             self.nav_btns.append(b)
@@ -862,13 +904,13 @@ class MainWindow(QMainWindow):
         topbar.setStyleSheet(f"background: {C.BG_2}; border-bottom: 1px solid {C.BORDER_SUB};")
         tb_layout = QHBoxLayout(topbar)
         tb_layout.setContentsMargins(S.LG, 0, S.LG, 0)
-        self.page_title = QLabel("Chat")
+        self.page_title = QLabel(t("nav.chat"))
         self.page_title.setFont(QFont(F.SANS, F.MD, F.SEMIBOLD))
         self.page_title.setStyleSheet(f"color: {C.TEXT_0};")
         tb_layout.addWidget(self.page_title)
         tb_layout.addStretch()
 
-        self.clear_btn = QPushButton("Clear")
+        self.clear_btn = QPushButton(t("chat.clear"))
         self.clear_btn.setStyleSheet(btn_ghost("font-size: 11px;"))
         self.clear_btn.setFixedHeight(D.BTN_SM)
         self.clear_btn.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -902,13 +944,20 @@ class MainWindow(QMainWindow):
         p.end()
         return px
 
-    _PAGE_TITLES = ["Chat", "Schedule", "Memory", "Ideas", "Settings"]
+    _PAGE_KEYS = ["nav.chat", "nav.schedule", "nav.memory", "nav.ideas", "nav.settings"]
+
+    def _refresh_lang(self):
+        for i, key in enumerate(self._PAGE_KEYS):
+            self.nav_btns[i].setText(f"    {t(key)}")
+        cur = self.stack.currentIndex()
+        self.page_title.setText(t(self._PAGE_KEYS[cur]))
+        self.clear_btn.setText(t("chat.clear"))
 
     def _switch(self, idx):
         self.stack.setCurrentIndex(idx)
         for i, b in enumerate(self.nav_btns):
             b.set_active(i == idx)
-        self.page_title.setText(self._PAGE_TITLES[idx])
+        self.page_title.setText(t(self._PAGE_KEYS[idx]))
         self.clear_btn.setVisible(idx == 0)
         refreshers = [None, self.schedule_page.refresh, self.memory_page.refresh,
                       self.ideas_page.refresh, self.settings_page.refresh]
@@ -935,11 +984,11 @@ class MainWindow(QMainWindow):
         self.tray.setIcon(QIcon(px))
         self.tray.setToolTip("Assistance")
         menu = QMenu()
-        sa = QAction("Show", self)
+        sa = QAction(t("tray.show"), self)
         sa.triggered.connect(self._show_window)
         menu.addAction(sa)
         menu.addSeparator()
-        qa = QAction("Quit", self)
+        qa = QAction(t("tray.quit"), self)
         qa.triggered.connect(QApplication.quit)
         menu.addAction(qa)
         self.tray.setContextMenu(menu)
@@ -949,17 +998,21 @@ class MainWindow(QMainWindow):
     # ── Hotkey ──
     def _setup_hotkey(self):
         self.toggle_signal.connect(self._toggle_window)
-        combo = {kb.Key.ctrl_l, kb.Key.alt_l}
         pressed = set()
+
+        def _has_ctrl():
+            return kb.Key.ctrl_l in pressed or kb.Key.ctrl_r in pressed
+
+        def _has_alt():
+            return kb.Key.alt_l in pressed or kb.Key.alt_r in pressed
 
         def on_press(key):
             pressed.add(key)
-            if combo.issubset(pressed):
-                try:
-                    if hasattr(key, 'char') and key.char == 'a':
-                        self.toggle_signal.emit()
-                except AttributeError:
-                    pass
+            if _has_ctrl() and _has_alt():
+                is_a = (hasattr(key, 'char') and key.char == 'a') or \
+                       (hasattr(key, 'vk') and key.vk == 65)
+                if is_a:
+                    self.toggle_signal.emit()
 
         def on_release(key):
             pressed.discard(key)
@@ -1002,30 +1055,35 @@ class MainWindow(QMainWindow):
         from datetime import datetime
         today = datetime.now().strftime("%Y-%m-%d")
         tasks = _ld()
-        due = [t for t in tasks if t.get("due_date") and t["due_date"] <= today and not t["done"] and t["id"] not in self._notified]
+        due = [tk for tk in tasks if tk.get("due_date") and tk["due_date"] <= today and not tk["done"] and tk["id"] not in self._notified]
         if due:
-            for t in due:
-                self._notified.add(t["id"])
-            titles = "\n".join(f"- {t['title']}" for t in due[:5])
-            self.tray.showMessage("Tasks", f"{len(due)} pending:\n{titles}", QSystemTrayIcon.MessageIcon.Information, 5000)
+            for tk in due:
+                self._notified.add(tk["id"])
+            titles = "\n".join(f"- {tk['title']}" for tk in due[:5])
+            self.tray.showMessage(
+                t("tray.tasks"),
+                f"{len(due)} pending:\n{titles}",
+                QSystemTrayIcon.MessageIcon.Information, 5000)
 
         now_str = datetime.now().strftime("%H:%M")
         now_m = int(now_str[:2]) * 60 + int(now_str[3:])
-        for t in [t for t in tasks if t.get("due_date") == today and not t["done"] and t.get("due_time")]:
-            nk = f"t_{t['id']}"
+        for tk in [tk for tk in tasks if tk.get("due_date") == today and not tk["done"] and tk.get("due_time")]:
+            nk = f"t_{tk['id']}"
             if nk in self._notified:
                 continue
             try:
-                h, m = map(int, t["due_time"].split(":"))
+                h, m = map(int, tk["due_time"].split(":"))
                 diff = h * 60 + m - now_m
                 if 0 <= diff <= 10:
                     self._notified.add(nk)
-                    tc = dict(t)
+                    tc = dict(tk)
                     def _go(task=tc, dl=diff):
                         from smart_notify import gen_pre_task_reminder
                         msg = gen_pre_task_reminder(task) or f"{task['title']} in {dl}min"
                         QTimer.singleShot(0, lambda: (
-                            self.tray.showMessage("Upcoming", msg, QSystemTrayIcon.MessageIcon.Information, 8000),
+                            self.tray.showMessage(
+                                t("tray.upcoming"), msg,
+                                QSystemTrayIcon.MessageIcon.Information, 8000),
                             self.chat_page._add_bubble(msg, False),
                         ))
                     threading.Thread(target=_go, daemon=True).start()
@@ -1036,13 +1094,16 @@ class MainWindow(QMainWindow):
         self.reminder_signal.emit(message, time_str)
 
     def _handle_reminder(self, message, time_str):
-        self.tray.showMessage(f"Reminder [{time_str}]", message, QSystemTrayIcon.MessageIcon.Information, 8000)
+        self.tray.showMessage(
+            f"{t('tray.reminder')} [{time_str}]", message,
+            QSystemTrayIcon.MessageIcon.Information, 8000)
         self.chat_page._add_bubble(f"[Reminder] {message}", False)
 
     def closeEvent(self, event):
         event.ignore()
         self.hide()
-        self.tray.showMessage("Assistance", "Minimized to tray. Ctrl+Alt+A to toggle.", QSystemTrayIcon.MessageIcon.Information, 2000)
+        self.tray.showMessage("Assistance", t("tray.minimized"),
+                              QSystemTrayIcon.MessageIcon.Information, 2000)
 
 
 def main():

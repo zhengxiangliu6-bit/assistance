@@ -5,7 +5,11 @@ import json
 from datetime import datetime, date
 from openai import OpenAI
 from dotenv import load_dotenv
-from memory import save_memory, delete_memory, search_memories, format_memories_for_prompt
+from memory import (
+    save_memory, delete_memory, update_memory, search_memories,
+    list_memories, get_memory_history, format_memories_for_prompt,
+)
+from memory_extractor import extract_memories_async
 from schedule import add_task, complete_task, delete_task, list_tasks, get_today_tasks
 from creative import save_idea, list_ideas, get_idea, update_idea_status, delete_idea
 from compressor import compress_messages, estimate_tokens
@@ -13,6 +17,7 @@ from settings import is_tool_allowed, get_blocked_tools
 from system_tools import open_url, open_application, read_clipboard, write_clipboard, read_file, write_file, list_directory, set_reminder
 from search import web_search, news_search
 from mcp_client import mcp_start, mcp_get_tools, mcp_is_tool, mcp_call_tool
+from skills import SkillLoader
 
 load_dotenv()
 
@@ -37,16 +42,17 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "save_memory",
-            "description": "记住用户的习惯、偏好或重要信息，跨对话保留。当用户提到自己的习惯、喜好、个人信息时主动调用。",
+            "description": "记住用户的习惯、偏好或重要信息，跨对话保留。当用户提到自己的习惯、喜好、个人信息时主动调用。系统会自动去重，重复内容不会重复保存。",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "content": {"type": "string", "description": "要记住的内容"},
                     "category": {
                         "type": "string",
-                        "enum": ["habit", "preference", "info", "general"],
-                        "description": "分类: habit=习惯, preference=偏好, info=重要信息, general=其他",
+                        "enum": ["habit", "preference", "info", "general", "goal", "decision", "event", "feedback"],
+                        "description": "分类: habit=习惯, preference=偏好, info=重要信息, goal=目标, decision=决策, event=事件, feedback=反馈, general=其他",
                     },
+                    "project": {"type": "string", "description": "所属项目或主题（可选，空=全局）"},
                 },
                 "required": ["content"],
             },
@@ -70,11 +76,58 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "delete_memory",
-            "description": "删除一条记忆。",
+            "description": "删除一条记忆（软删除，历史可查）。",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "memory_id": {"type": "integer", "description": "要删除的记忆 ID"},
+                },
+                "required": ["memory_id"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "update_memory",
+            "description": "更新一条记忆的内容或属性。内容变更时自动创建新版本，旧版本保留可查。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "memory_id": {"type": "integer", "description": "要更新的记忆 ID"},
+                    "content": {"type": "string", "description": "新内容（不填则不改内容）"},
+                    "category": {"type": "string", "description": "新分类（不填则不改分类）"},
+                    "project": {"type": "string", "description": "所属项目或主题"},
+                },
+                "required": ["memory_id"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "list_memories",
+            "description": "按条件筛选记忆列表。可按分类、项目、状态筛选。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "category": {"type": "string", "description": "按分类筛选（可选）"},
+                    "project": {"type": "string", "description": "按项目筛选（可选）"},
+                    "status": {"type": "string", "enum": ["active", "superseded", "revoked"], "description": "按状态筛选，默认 active"},
+                },
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_memory_history",
+            "description": "查看一条记忆的版本历史，了解它被更新或取代的记录。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "memory_id": {"type": "integer", "description": "记忆 ID"},
                 },
                 "required": ["memory_id"],
             },
@@ -333,6 +386,37 @@ TOOLS = [
             },
         },
     },
+    # ── 技能工具 ──
+    {
+        "type": "function",
+        "function": {
+            "name": "list_skills",
+            "description": "列出所有可用的技能（Skill）。当用户询问'有哪些技能'、'你能做什么特殊任务'时使用。",
+            "parameters": {"type": "object", "properties": {}, "required": []},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "activate_skill",
+            "description": "激活一个技能，使 Agent 获得该技能的专业流程指导。当用户的请求匹配某个技能的场景时主动激活。可用技能: document-to-action-items(从文档提取任务), weekly-review-planning(每周回顾与规划), humanizer(人性化文本去AI味)。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string", "description": "技能名称"},
+                },
+                "required": ["name"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "deactivate_skill",
+            "description": "停用当前激活的技能，恢复为通用模式。当技能任务完成后调用。",
+            "parameters": {"type": "object", "properties": {}, "required": []},
+        },
+    },
     # ── 搜索工具 ──
     {
         "type": "function",
@@ -364,10 +448,47 @@ TOOLS = [
     },
 ]
 
+# ── Skill 加载器 ──────────────────────────────────────────
+_skill_loader = SkillLoader()
+_active_skill: str | None = None
+
+
+def _activate_skill(name: str) -> str:
+    global _active_skill
+    if not _skill_loader.has_skill(name):
+        return f"[失败] 未找到技能: {name}。{_skill_loader.list_skills()}"
+    _active_skill = name
+    return f"[成功] 已激活技能: {name}"
+
+
+def _deactivate_skill() -> str:
+    global _active_skill
+    if _active_skill is None:
+        return "当前没有激活的技能。"
+    old = _active_skill
+    _active_skill = None
+    return f"[成功] 已停用技能: {old}"
+
+
 TOOL_MAP = {
-    "save_memory": lambda args: save_memory(args["content"], args.get("category", "general")),
+    "save_memory": lambda args: save_memory(
+        args["content"], args.get("category", "general"),
+        project=args.get("project", ""),
+    ),
     "search_memories": lambda args: json.dumps(search_memories(args.get("keyword", "")), ensure_ascii=False),
     "delete_memory": lambda args: delete_memory(args["memory_id"]),
+    "update_memory": lambda args: update_memory(
+        args["memory_id"],
+        content=args.get("content"),
+        category=args.get("category"),
+        project=args.get("project"),
+    ),
+    "list_memories": lambda args: list_memories(
+        category=args.get("category", ""),
+        project=args.get("project", ""),
+        status=args.get("status", "active"),
+    ),
+    "get_memory_history": lambda args: get_memory_history(args["memory_id"]),
     "add_task": lambda args: add_task(args["title"], args.get("due_date", ""), args.get("due_time", ""), args.get("priority", "normal")),
     "complete_task": lambda args: complete_task(args["task_id"]),
     "delete_task": lambda args: delete_task(args["task_id"]),
@@ -388,6 +509,9 @@ TOOL_MAP = {
     "set_reminder": lambda args: set_reminder(args["time_str"], args["message"]),
     "web_search": lambda args: web_search(args["query"], args.get("max_results", 5)),
     "news_search": lambda args: news_search(args["query"], args.get("max_results", 5)),
+    "list_skills": lambda _: _skill_loader.list_skills(),
+    "activate_skill": lambda args: _activate_skill(args["name"]),
+    "deactivate_skill": lambda _: _deactivate_skill(),
 }
 
 
@@ -433,7 +557,11 @@ def build_system_prompt(user_query: str = "") -> str:
 5. 帮用户搜索信息：使用 mcp_fetch_fetch 抓取网页获取信息
 
 工具使用规则：
-- 当用户提到自己的习惯/偏好/个人信息时，用 save_memory 保存
+- 当用户提到自己的习惯/偏好/个人信息/目标/决策时，用 save_memory 保存（系统会自动去重）
+- 当用户要求修改已有记忆时，用 update_memory 更新（会自动保留版本历史）
+- 当用户要求查看记忆列表时，用 list_memories 筛选；查看记忆变更历史用 get_memory_history
+- 记忆分类包括: habit(习惯), preference(偏好), info(信息), goal(目标), decision(决策), event(事件), feedback(反馈)
+- 记忆中标注"待确认"的内容是系统自动推断的，需要你在合适时机向用户确认
 - 当用户要求添加待办/日程时，用 add_task 添加。务必将时间信息拆分到 due_date 和 due_time 字段，不要把时间写进 title 里。例如用户说"今天下午3点开会"，title="开会"，due_date=今天日期，due_time="15:00"
 - 当用户询问安排时，用 list_tasks 或 get_today_tasks 查看
 - 当用户说"打开XX"时，判断是网站还是应用，调用 open_url 或 open_application
@@ -460,6 +588,11 @@ def build_system_prompt(user_query: str = "") -> str:
 
     if memory_context:
         prompt += f"\n\n{memory_context}"
+
+    if _active_skill:
+        skill_prompt = _skill_loader.get_skill_prompt(_active_skill)
+        if skill_prompt:
+            prompt += skill_prompt
 
     return prompt
 
@@ -607,5 +740,10 @@ class AgentEngine:
             self.messages = compress_messages(client, MODEL, self.messages)
             if len(self.messages) < old_len:
                 yield ("compressed", f"{old_len}条 -> {len(self.messages)}条")
+
+        # 对话后异步记忆提取（后台线程，不阻塞）
+        from settings import get_permission
+        if get_permission("auto_save_memory"):
+            extract_memories_async(client, MODEL, list(self.messages))
 
         yield ("done", full_reply)

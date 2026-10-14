@@ -79,7 +79,7 @@ PERMISSION_DEFS = {
 
 # 权限 → 工具名的映射（用于运行时检查）
 PERMISSION_TOOL_MAP = {
-    "auto_save_memory": ["save_memory", "delete_memory", "search_memories"],
+    "auto_save_memory": ["save_memory", "delete_memory", "search_memories", "update_memory", "list_memories", "get_memory_history"],
     "auto_manage_schedule": ["add_task", "complete_task", "delete_task", "list_tasks", "get_today_tasks"],
     "auto_save_ideas": ["save_idea", "list_ideas", "get_idea", "update_idea_status", "delete_idea"],
     "network_search": ["web_search", "news_search"],

@@ -9,6 +9,7 @@ from PyQt6.QtGui import QFont, QColor, QPainter, QBrush, QKeyEvent, QPixmap
 
 from .theme import C, S, F, D
 from .animations import StatusDot
+from i18n import t
 
 
 # ── Sidebar Nav Item ──────────────────────────────────────
@@ -63,35 +64,31 @@ class MessageBubble(QFrame):
         self.label.setFont(QFont(F.SANS, F.BASE))
         self.label.setText(text)
         self.label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
-        self.label.setMinimumWidth(40)
-
         layout = QHBoxLayout(self)
         layout.setContentsMargins(S.LG, S.XXS, S.LG, S.XXS)
 
+        bubble_style = f"padding: {S.SM}px {S.MD}px; border: 1px solid {C.BORDER_SUB};"
+        self.label.setMinimumWidth(350)
         if is_user:
-            layout.addStretch()
+            layout.addStretch(1)
             self.label.setStyleSheet(f"""
-                background-color: {C.BUBBLE_USER};
-                color: {C.TEXT_0};
+                background-color: {C.BUBBLE_USER}; color: {C.TEXT_0};
                 border-radius: {D.RADIUS_LG}px;
                 border-bottom-right-radius: {D.RADIUS_SM}px;
-                padding: {S.SM}px {S.MD}px;
-                border: 1px solid {C.BORDER_SUB};
+                {bubble_style}
             """)
-            self.label.setMaximumWidth(500)
+            self.label.setMaximumWidth(520)
             layout.addWidget(self.label)
         else:
             self.label.setStyleSheet(f"""
-                background-color: {C.BUBBLE_AI};
-                color: {C.TEXT_1};
+                background-color: {C.BUBBLE_AI}; color: {C.TEXT_1};
                 border-radius: {D.RADIUS_LG}px;
                 border-bottom-left-radius: {D.RADIUS_SM}px;
-                padding: {S.SM}px {S.MD}px;
-                border: 1px solid {C.BORDER_SUB};
+                {bubble_style}
             """)
-            self.label.setMaximumWidth(560)
+            self.label.setMaximumWidth(600)
             layout.addWidget(self.label)
-            layout.addStretch()
+            layout.addStretch(1)
 
     def append_text(self, text):
         self.label.setText(self.label.text() + text)
@@ -104,11 +101,11 @@ class MessageBubble(QFrame):
 
 class AgentStatus(QWidget):
     STATES = {
-        "idle":      ("Ready", C.TEXT_3, C.SUCCESS),
-        "thinking":  ("Thinking...", C.WARNING, C.WARNING),
-        "tool":      ("Running tool", C.PURPLE, C.PURPLE),
-        "streaming": ("Generating...", C.ACCENT, C.ACCENT),
-        "error":     ("Error", C.DANGER, C.DANGER),
+        "idle":      ("status.ready", C.TEXT_3, C.SUCCESS),
+        "thinking":  ("status.thinking", C.WARNING, C.WARNING),
+        "tool":      ("status.tool", C.PURPLE, C.PURPLE),
+        "streaming": ("status.streaming", C.ACCENT, C.ACCENT),
+        "error":     ("status.error", C.DANGER, C.DANGER),
     }
 
     def __init__(self, parent=None):
@@ -121,7 +118,7 @@ class AgentStatus(QWidget):
         self.dot = StatusDot(C.SUCCESS, 6)
         layout.addWidget(self.dot)
 
-        self.label = QLabel("Ready")
+        self.label = QLabel(t("status.ready"))
         self.label.setFont(QFont(F.MONO, F.XS))
         self.label.setStyleSheet(f"color: {C.TEXT_3};")
         layout.addWidget(self.label)
@@ -134,8 +131,8 @@ class AgentStatus(QWidget):
 
     def set_state(self, state, detail=""):
         info = self.STATES.get(state, self.STATES["idle"])
-        text, text_color, dot_color = info
-        self.label.setText(text)
+        key, text_color, dot_color = info
+        self.label.setText(t(key))
         self.label.setStyleSheet(f"color: {text_color};")
         self.dot.set_color(dot_color)
         self.detail.setText(detail)
@@ -165,7 +162,7 @@ class ChatComposer(QFrame):
         layout.setSpacing(S.XXS)
 
         self.text_edit = ComposerTextEdit()
-        self.text_edit.setPlaceholderText("Message Assistance...")
+        self.text_edit.setPlaceholderText(t("chat.placeholder"))
         self.text_edit.setFont(QFont(F.SANS, F.BASE))
         self.text_edit.setStyleSheet(f"""
             QTextEdit {{
@@ -278,7 +275,7 @@ class SectionHeader(QWidget):
 # ── Empty State ───────────────────────────────────────────
 
 class EmptyState(QWidget):
-    def __init__(self, text="Nothing here yet", parent=None):
+    def __init__(self, text=None, parent=None):
         super().__init__(parent)
         layout = QVBoxLayout(self)
         layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -309,13 +306,13 @@ class ChatWelcomeView(QWidget):
         layout.addWidget(icon)
         layout.addSpacing(S.XS)
 
-        title = QLabel("What can I help you with?")
+        title = QLabel(t("chat.welcome_title"))
         title.setFont(QFont(F.SANS, F.XL, F.SEMIBOLD))
         title.setStyleSheet(f"color: {C.TEXT_0};")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(title)
 
-        sub = QLabel("Your personal AI workspace.")
+        sub = QLabel(t("chat.welcome_sub"))
         sub.setFont(QFont(F.SANS, F.SM))
         sub.setStyleSheet(f"color: {C.TEXT_3};")
         sub.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -328,10 +325,10 @@ class ChatWelcomeView(QWidget):
         actions_row.setSpacing(S.SM)
 
         quick_items = [
-            ("Plan my day", "帮我安排一下今天的日程"),
-            ("Review tasks", "我今天有什么待办事项？"),
-            ("Search memory", "你还记得我的作息习惯吗？"),
-            ("Capture idea", "我有一个新的想法想分析一下"),
+            (t("chat.quick.plan"), t("chat.quick.plan_prompt")),
+            (t("chat.quick.tasks"), t("chat.quick.tasks_prompt")),
+            (t("chat.quick.memory"), t("chat.quick.memory_prompt")),
+            (t("chat.quick.idea"), t("chat.quick.idea_prompt")),
         ]
 
         for label, prompt in quick_items:
